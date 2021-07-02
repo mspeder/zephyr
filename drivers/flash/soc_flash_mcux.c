@@ -111,10 +111,12 @@ static status_t is_area_readable(uint32_t addr, size_t len)
 
 struct flash_priv {
 	flash_config_t config;
+#if IS_ENABLED(CONFIG_MULTITHREADING)
 	/*
 	 * HACK: flash write protection is managed in software.
 	 */
 	struct k_sem write_lock;
+#endif
 	uint32_t pflash_block_base;
 };
 
@@ -144,9 +146,11 @@ static int flash_mcux_erase(const struct device *dev, off_t offset,
 	status_t rc;
 	unsigned int key;
 
+#if IS_ENABLED(CONFIG_MULTITHREADING)
 	if (k_sem_take(&priv->write_lock, K_FOREVER)) {
 		return -EACCES;
 	}
+#endif
 
 	addr = offset + priv->pflash_block_base;
 
@@ -154,7 +158,9 @@ static int flash_mcux_erase(const struct device *dev, off_t offset,
 	rc = FLASH_Erase(&priv->config, addr, len, kFLASH_ApiEraseKey);
 	irq_unlock(key);
 
+#if IS_ENABLED(CONFIG_MULTITHREADING)
 	k_sem_give(&priv->write_lock);
+#endif
 
 	return (rc == kStatus_Success) ? 0 : -EINVAL;
 }
@@ -209,9 +215,11 @@ static int flash_mcux_write(const struct device *dev, off_t offset,
 	status_t rc;
 	unsigned int key;
 
+#if IS_ENABLED(CONFIG_MULTITHREADING)
 	if (k_sem_take(&priv->write_lock, K_FOREVER)) {
 		return -EACCES;
 	}
+#endif
 
 	addr = offset + priv->pflash_block_base;
 
@@ -219,7 +227,9 @@ static int flash_mcux_write(const struct device *dev, off_t offset,
 	rc = FLASH_Program(&priv->config, addr, (uint8_t *) data, len);
 	irq_unlock(key);
 
+#if IS_ENABLED(CONFIG_MULTITHREADING)
 	k_sem_give(&priv->write_lock);
+#endif
 
 	return (rc == kStatus_Success) ? 0 : -EINVAL;
 }
@@ -266,7 +276,9 @@ static int flash_mcux_init(const struct device *dev)
 	uint32_t pflash_block_base;
 	status_t rc;
 
+#if IS_ENABLED(CONFIG_MULTITHREADING)
 	k_sem_init(&priv->write_lock, 1, 1);
+#endif
 
 	rc = FLASH_Init(&priv->config);
 
